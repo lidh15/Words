@@ -4,67 +4,89 @@ Created on Tue Jul 31 22:19:15 2018
 
 @author: Li Denghao
 """
-from torch import nn, transpose, cat, randn, zeros_like, unsqueeze
+from torch import nn, randn, tensor, unsqueeze
+from concurrent.futures import ProcessPoolExecutor
 
-class EEGvae2d(nn.Module):
-    def __init__(self, gpu=-1, chans=12, fband=18):
-        super(EEGvae2d, self).__init__()
-        chans1 = 16
-        chans2 = 8
-        step1 = 7
-        self.en = nn.Sequential( 
-            # input shape (1, chans*fband)
-            nn.Conv1d(1, chans1, step1, step1),
-            # output shape (chans1, chans*fband/step1)
-            # nn.Dropout(p=0.2),
-            nn.BatchNorm1d(chans1),
-            nn.Tanh(),
-            # input shape (chans1, chans*fband/step1)
-            nn.Conv1d(chans1, chans2, step1, step1),
-            # output shape (chans2, chans*fband/step1/step1)
-            # nn.Dropout(p=0.2),
-            nn.BatchNorm1d(chans2),
+class EEGvae(nn.Module):
+    def __init__(self, gpu=-1, zdim=2, chans=12, length=63, fband=14):
+        super(EEGvae, self).__init__()
+        fg_chans = 35
+        filter_len = 7
+        self.filter_generator = nn.Sequential(
+            nn.Linear(chans*fband, fg_chans),
+            nn.Tanh(), 
+            nn.Linear(fg_chans, filter_len),
             nn.Tanh(),
         )
-        step2 = 7
-        self.de = nn.Sequential( 
-            # input shape (1, 2)
-            nn.Linear(2, 2*step2), 
-            # output shape (1, 2*step2)
+        self.local_padding = int((filter_len-1)/2)
+
+        en_chans1 = 16
+        en_chans2 = 32
+        en_kernel = 6
+        en_stride = 3
+        self.encoder = nn.Sequential( 
+            # input shape (chans, length-filter_len+1)
+            nn.Conv1d(chans, en_chans1, en_kernel, en_stride),
+            # output shape (en_chans1, 18) see pytorch doc for output shape calculation detail
+            # nn.Dropout(p=0.2),
+            nn.BatchNorm1d(en_chans1),
+            nn.Tanh(),
+            # input shape (en_chans1, 18)
+            nn.Conv1d(en_chans1, en_chans2, en_kernel, en_stride),
+            # output shape (en_chans2, 5) see pytorch doc for output shape calculation detail
+            # nn.Dropout(p=0.2),
+            nn.BatchNorm1d(en_chans2),
+            nn.Tanh(),
+        )
+        en_out_size = en_chans2*5
+
+        self.h_mu = nn.Linear(int(en_out_size), zdim)
+        self.h_logvar = nn.Linear(int(en_out_size), zdim)
+
+        de_step = 5
+        de_out_size = 50
+        self.decoder = nn.Sequential( 
+            # input shape (1, zdim)
+            nn.Linear(zdim, zdim*de_step), 
+            # output shape (1, zdim*de_step)
             # nn.Dropout(p=0.2),
             nn.Tanh(), 
-            # input shape (1, 2*step2)
-            nn.Linear(2*step2, 2*step2*step2), 
+            # input shape (1, zdim*de_step)
+            nn.Linear(zdim*de_step, de_out_size), 
             # output shape (1, 2*step2*step2)
             # nn.Dropout(p=0.2),
             nn.Tanh(), 
-            # input shape (1, 2*step2*step2)
-            nn.Linear(2*step2*step2, chans*fband), 
-            # output shape (1, chans*fband)
-            # nn.Dropout(p=0.2),
         )
-        self.h1 = nn.Linear(int(chans2*chans*fband/step1/step1), 2)
-        self.h2 = nn.Linear(int(chans2*chans*fband/step1/step1), 2)
-        self.activate_t = nn.Hardtanh(min_val=-5, max_val=5)
-        self.activate_f = nn.ReLU()
+
         self.gpu = gpu
-        self.freq = freq
+        self.zdim = zdim
+        self.chans = chans
+        self.length = length
+        self.fband = fband
         
-    def forward(self, x):
-        x = unsqueeze(x, -2)
-        enout = self.en(x)
-        enout =  enout.view(enout.size(0), -1)
-        mu = self.h1(enout)
-        logvar = self.h2(enout)
+    def adaptive_filt(self, adaptive_filter, raw_eeg): 
+        return nn.functional.conv1d(
+            unsqueeze(unsqueeze(raw_eeg,0),0),
+            unsqueeze(unsqueeze(adaptive_filter,0),0), 
+            padding=self.local_padding
+            )
+        
+    def forward(self, raw_eeg, eegf):
+        batch_size = raw_eeg.shape[0]
+        adaptive_filter = self.filter_generator(eegf)
+        pool = ProcessPoolExecutor(max_workers=8)
+        eeg = pool.map(self.adaptive_filt, zip(adaptive_filter, raw_eeg))
+        eeg = tensor(eeg).reshape((batch_size,self.chans,-1))[:,:,self.local_padding:-self.local_padding]
+        en_out = self.encoder(eeg)
+        en_out =  en_out.view(en_out.size(0), -1)
+        mu = self.h_mu(en_out)
+        logvar = self.h_logvar(en_out)
         std = logvar.mul(0.5).exp()
         eps = randn(mu.size(0), mu.size(1))
         if self.gpu >= 0:
             eps = eps.cuda(self.gpu)
         z = mu + eps * std
         z = unsqueeze(z, -2)
-        output = self.de(z).squeeze(-2)
-        if self.freq:
-            output = self.activate_f(output)
-        else:
-            output = self.activate_t(output)
+        output = self.decoder(z).squeeze(-2)
+
         return output, mu, logvar

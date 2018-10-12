@@ -2,3 +2,5 @@ data
 wordslist
 *.txt
 *.xlsx
+*.pkl
+*.npy
