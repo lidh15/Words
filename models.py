@@ -66,8 +66,6 @@ class EEGvae(nn.Module):
         
     def adaptive_filt(self, filter_input):
         adaptive_filter, raw_eeg = unsqueeze(unsqueeze(filter_input[0], 0), 0), unsqueeze(unsqueeze(filter_input[1], 0), 0)
-        print(adaptive_filter.shape)
-        print(raw_eeg.shape)
         return nn.functional.conv1d(raw_eeg, adaptive_filter, padding=self.filter_padding)
         
     def forward(self, raw_eeg, eegf):
