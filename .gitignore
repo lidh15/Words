@@ -1,5 +1,5 @@
 data
-wordslist
+wordlists
 *.txt
 *.xlsx
 *.pkl
