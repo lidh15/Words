@@ -31,7 +31,7 @@ class EEG500ms(data.Dataset):
                 line = line.split(' ')
                 vocab[line[0]] = np.asarray([float(x) for x in line[1:]])
         file_names = os.listdir(data_path)
-        print(vocab)
+
         if not test_IDs:
             test_IDs = [file_name[:3] for file_name in file_names]
         
@@ -50,6 +50,7 @@ class EEG500ms(data.Dataset):
                 time_step = 12.69
                 sample_num = int((len(f['data'])-ideal_len)/time_step)
                 f.close()
+                print(sample_num)
                 if training:
                     with open(label_path+test_ID+'.txt') as f:
                         i = 0
