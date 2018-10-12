@@ -71,7 +71,8 @@ class EEGvae(nn.Module):
             padding=self.local_padding
             )
         
-    def forward(self, raw_eeg, eegf):
+    def forward(self, x):
+        raw_eeg, eegf = x[0], x[1]
         batch_size = raw_eeg.shape[0]
         adaptive_filter = self.filter_generator(eegf)
         pool = ProcessPoolExecutor(max_workers=8)
