@@ -4,8 +4,8 @@ Created on Tue Jul 31 22:19:15 2018
 
 @author: Li Denghao
 """
-from torch import nn, randn, tensor, unsqueeze
-from concurrent.futures import ThreadPoolExecutor
+from torch import nn, randn, zeros_like, unsqueeze, tensor
+# from concurrent.futures import ThreadPoolExecutor
 
 class EEGvae(nn.Module):
     def __init__(self, gpu=-1, zdim=2, chans=12, length=63, fband=14):
@@ -64,9 +64,11 @@ class EEGvae(nn.Module):
         self.length = length
         self.fband = fband
         
-    def adaptive_filt(self, filter_input):
-        adaptive_filter, raw_eeg = unsqueeze(unsqueeze(filter_input[0], 0), 0), unsqueeze(unsqueeze(filter_input[1], 0), 0)
-        return nn.functional.conv1d(raw_eeg, adaptive_filter, padding=self.filter_padding)
+    # Call function here made it stupidly slow.
+    # def adaptive_filt(self, filter_input):
+    #     adaptive_filter, raw_eeg = unsqueeze(unsqueeze(filter_input[0], 0), 0), unsqueeze(unsqueeze(filter_input[1], 0), 0)
+    #     filtered_eeg = nn.functional.conv1d(raw_eeg, adaptive_filter, padding=self.filter_padding)
+    #     return filtered_eeg.squeeze(0).squeeze(0)
         
     def forward(self, raw_eeg, eegf):
         '''
@@ -74,12 +76,23 @@ class EEGvae(nn.Module):
         '''
         batch_size = raw_eeg.shape[0]
         adaptive_filter = self.filter_generator(eegf)
-        filter_pool = ThreadPoolExecutor(max_workers=8)
-        eeg_generator = filter_pool.map(self.adaptive_filt, zip(adaptive_filter, raw_eeg))
-        eeg = [list(eeg_piece) for eeg_piece in eeg_generator]
-        eeg = tensor(eeg).reshape((batch_size, self.chans, -1))
-        eeg = eeg[:, :, self.filter_padding:-self.filter_padding]
-        # I used to write these 7 lines above in one line, but it was unreadable.
+
+        # eeg = [list(eeg_piece) for eeg_piece in ThreadPoolExecutor(max_workers=8).map(self.adaptive_filt, zip(adaptive_filter, raw_eeg))]
+        # eeg = [list(self.adaptive_filt(eeg_piece)) for eeg_piece in zip(adaptive_filter, raw_eeg)]
+        # It seems that multithreading acceleration is useless.
+        # eeg = tensor(eeg)
+        # if self.gpu >= 0:
+        #     eeg = eeg.cuda(self.gpu)
+
+        eeg = zeros_like(raw_eeg)
+        for i in range(batch_size):
+            eeg[i] = nn.functional.conv1d(
+                unsqueeze(unsqueeze(raw_eeg[i], 0), 0),
+                unsqueeze(unsqueeze(adaptive_filter[i], 0), 0),
+                padding=self.filter_padding
+                ).squeeze(0).squeeze(0)
+        eeg = eeg.reshape((batch_size, self.chans, -1))[:, :, self.filter_padding:-self.filter_padding]
+
         en_out = self.encoder(eeg)
         en_out = en_out.view(en_out.size(0), -1)
         mu = self.h_mu(en_out)

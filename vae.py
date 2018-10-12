@@ -45,7 +45,7 @@ def loss_func(output, x, mu, logvar):
 
 
 # Datasets
-training_set = EEG500ms(test_IDs=training, max_sample_num=200000)
+training_set = EEG500ms(test_IDs=training, max_sample_num=20000)
 t_len = len(training_set)
 # Generators
 training_generator = DataLoader(training_set, **params)
@@ -67,6 +67,7 @@ for epoch in range(EPOCHS):
             if CUDA:
                 local_batch = local_batch.cuda(GPU)
                 local_f = local_f.cuda(GPU)
+                target = target.cuda(GPU)
             output, mu, logvar = eegnet(local_batch, local_f)
             loss, mse, z = loss_func(output, target, mu, logvar)
             total_mse_loss += mse.data.item()/t_len

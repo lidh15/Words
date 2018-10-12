@@ -29,14 +29,15 @@ class EEG500ms(data.Dataset):
         with open('newvocab.txt') as f:
             for line in f.readlines():
                 line = line.split(' ')
-                vocab[line[0]] = np.asarray([float(x) for x in line[1:]])
+                vocab[line[0]] = np.asarray([float(x) for x in line[1:]], dtype='float32')
         file_names = os.listdir(data_path)
-
         if not test_IDs:
             test_IDs = [file_name[:3] for file_name in file_names]
-        
+        shuffle(file_names)
         for file_name in file_names:
             test_ID = file_name[:3]
+            if len(labels) > max_sample_num:
+                break
             if test_ID in test_IDs:
                 f = h5py.File(data_path+file_name, 'r')
                 '''
