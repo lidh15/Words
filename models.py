@@ -69,7 +69,7 @@ class EEGvae(nn.Module):
         return nn.functional.conv1d(
             unsqueeze(unsqueeze(adaptive_filter, 0), 0),
             unsqueeze(unsqueeze(raw_eeg, 0), 0),
-            padding=self.filter_padding
+            padding=3#self.filter_padding
             )
         
     def forward(self, raw_eeg, eegf):
