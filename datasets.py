@@ -50,16 +50,16 @@ class EEG500ms(data.Dataset):
                 time_step = 12.69
                 sample_num = int((len(f['data'])-ideal_len)/time_step)
                 f.close()
-                print(sample_num)
                 if training:
-                    with open(label_path+test_ID+'.txt') as f:
+                    with open(label_path+test_ID+'.txt') as label_file:
                         i = 0
-                        for line in f.readlines():
-                            if line in vocab.keys():
+                        for line in label_file.readlines():
+                            label = line[:-1]
+                            if label in vocab.keys():
                                 for j in range(sample_num):
                                     eeg_list.append(int(((i*1.5+1)*126.9)+time_step*j))
-                                    label_list.append({'ID':test_ID, 'target':vocab[line]})
-                                    labels.append(vocab[line])
+                                    label_list.append({'ID':test_ID, 'target':vocab[label]})
+                                    labels.append(vocab[label])
                             i += 1
 
         self.sample_shape = sample_shape
