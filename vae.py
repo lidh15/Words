@@ -63,10 +63,11 @@ for epoch in range(EPOCHS):
     if True:
         total_mse_loss = 0
         total_z_loss = 0
-        for local_batch, target in training_generator:
+        for local_batch, local_f, target in training_generator:
             if CUDA:
                 local_batch = local_batch.cuda(GPU)
-            output, mu, logvar = eegnet(local_batch)
+                local_f = local_f.cuda(GPU)
+            output, mu, logvar = eegnet(local_batch, local_f)
             loss, mse, z = loss_func(output, target, mu, logvar)
             total_mse_loss += mse.data.item()/t_len
             total_z_loss += z.data.item()/t_len
@@ -79,10 +80,11 @@ for epoch in range(EPOCHS):
         # # Validation process
         # val_mse_loss = 0
         # val_z_loss = 0
-        # for val_batch, target in validation_generator:
+        # for val_batch, val_f, target in validation_generator:
         #     if CUDA:
         #         val_batch = val_batch.cuda(GPU)
-        #     output, mu, logvar = eegnet(val_batch)
+        #         val_f = val_f.cuda(GPU)
+        #     output, mu, logvar = eegnet(val_batch, val_f)
         #     loss, mse, z = loss_func(output, target, mu, logvar)
         #     val_mse_loss += mse.data.item()/v_len
         #     val_z_loss += z.data.item()/v_len
@@ -95,12 +97,14 @@ for epoch in range(EPOCHS):
         data = np.zeros((t_len,4))
         i = 0
         eegnet.eval()
-        for local_batch, _ in training_generator :
+        for local_batch, local_f, _ in training_generator:
             if CUDA:
                 local_batch = local_batch.cuda(GPU)
-            _, mu, logvar = eegnet(local_batch)
+                local_f = local_f.cuda(GPU)
+            _, mu, logvar = eegnet(local_batch, local_f)
             if CUDA:
                 mu = mu.cpu()
+                logvar = logvar.cpu()
             data[i*PARA:i*PARA+PARA,:2] = mu.detach().numpy()
             data[i*PARA:i*PARA+PARA,2:4] = logvar.detach().numpy()
             i += 1

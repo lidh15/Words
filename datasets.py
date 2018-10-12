@@ -93,4 +93,4 @@ class EEG500ms(data.Dataset):
         else:
             y = self.labels[index]
 
-        return (eeg, eegf), y
+        return eeg, eegf, y
