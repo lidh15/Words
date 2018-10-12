@@ -18,7 +18,10 @@ from torch.utils import data
 
 
 class EEG500ms(data.Dataset):
-    def __init__(self, test_IDs=[], max_sample_num=200000, sample_shape=(12,63), data_path='./data/', label_path='./wordlists/', training=True):
+    '''
+
+    '''
+    def __init__(self, test_IDs=[], max_sample_num=200000, sample_shape=(12, 63), data_path='./data/', label_path='./wordlists/', training=True):
         vocab = {}
         eeg_list = []
         label_list = []
@@ -27,13 +30,14 @@ class EEG500ms(data.Dataset):
             for line in f.readlines():
                 line = line.split(' ')
                 vocab[line[0]] = np.asarray([float(x) for x in line[1:]])
+        file_names = os.listdir(data_path)
 
         if not test_IDs:
-            test_IDs = list(set([file_name[:3] for file_name in os.listdir(data_path)]))
-        file_names = os.listdir(data_path)
+            test_IDs = [file_name[:3] for file_name in file_names]
+        
         for file_name in file_names:
-            ID = file_name[:3]
-            if ID in test_IDs:
+            test_ID = file_name[:3]
+            if test_ID in test_IDs:
                 f = h5py.File(data_path+file_name, 'r')
                 '''
                 126.9Hz sample frequency (with a little fluctuation, see f['frequency'])
@@ -47,17 +51,16 @@ class EEG500ms(data.Dataset):
                 sample_num = int((len(f['data'])-ideal_len)/time_step)
                 f.close()
                 if training:
-                    with open(label_path+ID+'.txt') as f:
+                    with open(label_path+test_ID+'.txt') as f:
                         i = 0
                         for line in f.readlines():
-                            if line in vocab:
+                            if line in vocab.keys():
                                 for j in range(sample_num):
                                     eeg_list.append(int(((i*1.5+1)*126.9)+time_step*j))
-                                    label_list.append({'ID':ID, 'target':vocab[line]})
+                                    label_list.append({'ID':test_ID, 'target':vocab[line]})
                                     labels.append(vocab[line])
                             i += 1
 
-        
         self.sample_shape = sample_shape
         self.data_path = data_path
         self.label_path = label_path
@@ -75,13 +78,13 @@ class EEG500ms(data.Dataset):
         length = self.sample_shape[1]
         chans = self.sample_shape[0]
         pos = self.eeg_list[index]
-        f = h5py.File(self.data_path+self.label_list[index]['ID']+'.h5','r')
+        f = h5py.File(self.data_path+self.label_list[index]['ID']+'.h5', 'r')
         eeg = f['data'][pos:pos+length].T
         f.close()
-        eeg_std = np.sqrt(np.var(np.sort(eeg,1)[:,3:-3],1))
+        eeg_std = np.sqrt(np.var(np.sort(eeg, 1)[:, 3:-3], 1))
         for i in range(chans):
             eeg[i] /= eeg_std[i]
-        eegf = np.abs(fft(eeg)[:,4:18])
+        eegf = np.abs(fft(eeg)[:, 4:18])
         eeg = eeg.reshape(length*chans)
         eegf = eegf.reshape(eegf.shape[0]*eegf.shape[1])
         if not self.training: # For validation, return all information
