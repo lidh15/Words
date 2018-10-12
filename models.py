@@ -18,7 +18,7 @@ class EEGvae(nn.Module):
             nn.Linear(fg_chans, filter_len),
             nn.Tanh(),
         )
-        self.local_padding = int((filter_len-1)/2)
+        self.filter_padding = int((filter_len-1)/2)
 
         en_chans1 = 16
         en_chans2 = 32
@@ -66,9 +66,9 @@ class EEGvae(nn.Module):
         
     def adaptive_filt(self, filter_input): 
         return nn.functional.conv1d(
-            unsqueeze(unsqueeze(filter_input[0],0),0),
-            unsqueeze(unsqueeze(filter_input[1],0),0), 
-            padding=self.local_padding
+            unsqueeze(unsqueeze(filter_input[0], 0), 0),
+            unsqueeze(unsqueeze(filter_input[1], 0), 0), 
+            padding=self.filter_padding
             )
         
     def forward(self, raw_eeg, eegf):
@@ -81,7 +81,7 @@ class EEGvae(nn.Module):
         eeg_generator = filter_pool.map(self.adaptive_filt, zip(adaptive_filter, raw_eeg))
         eeg = tensor([list(eeg_piece) for eeg_piece in eeg_generator])
         eeg = eeg.reshape((batch_size, self.chans, -1))
-        eeg = eeg[:, :, self.local_padding:-self.local_padding]
+        eeg = eeg[:, :, self.filter_padding:-self.filter_padding]
         # I used to write these 7 lines above in one line, but it was unreadable.
         en_out = self.encoder(eeg)
         en_out = en_out.view(en_out.size(0), -1)
