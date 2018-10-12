@@ -49,7 +49,7 @@ class EEG500ms(data.Dataset):
                 if training:
                     with open(label_path+ID+'.txt') as f:
                         i = 0
-                        for line in f.readlines:
+                        for line in f.readlines():
                             if line in vocab:
                                 for j in range(sample_num):
                                     eeg_list.append(int(((i*1.5+1)*126.9)+time_step*j))
