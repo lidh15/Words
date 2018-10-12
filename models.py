@@ -74,11 +74,13 @@ class EEGvae(nn.Module):
     def forward(self, raw_eeg, eegf):
         batch_size = raw_eeg.shape[0]
         adaptive_filter = self.filter_generator(eegf)
-        pool = ProcessPoolExecutor(max_workers=8)
-        eeg = pool.map(self.adaptive_filt, zip(adaptive_filter, raw_eeg))
-        eeg = tensor(eeg).reshape((batch_size,self.chans,-1))[:,:,self.local_padding:-self.local_padding]
+        process_pool = ProcessPoolExecutor(max_workers=8)
+        eeg_generator = process_pool.map(self.adaptive_filt, zip(adaptive_filter, raw_eeg))
+        eeg = tensor([list(eeg_piece) for eeg_piece in eeg_generator])
+        eeg = eeg.reshape((batch_size, self.chans, -1))
+        eeg = eeg[:, :, self.local_padding:-self.local_padding]
         en_out = self.encoder(eeg)
-        en_out =  en_out.view(en_out.size(0), -1)
+        en_out = en_out.view(en_out.size(0), -1)
         mu = self.h_mu(en_out)
         logvar = self.h_logvar(en_out)
         std = logvar.mul(0.5).exp()
