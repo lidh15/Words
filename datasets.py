@@ -24,7 +24,7 @@ class EEG500ms(data.Dataset):
         label_list = []
         labels = []
         with open('newvocab.txt') as f:
-            for line in f.readlines:
+            for line in f.readlines():
                 line = line.split(' ')
                 vocab[line[0]] = np.asarray([float(x) for x in line[1:]])
 
