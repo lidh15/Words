@@ -5,7 +5,7 @@ Created on Tue Jul 31 22:19:15 2018
 @author: Li Denghao
 """
 from torch import nn, randn, tensor, unsqueeze
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 
 class EEGvae(nn.Module):
     def __init__(self, gpu=-1, zdim=2, chans=12, length=63, fband=14):
@@ -72,13 +72,17 @@ class EEGvae(nn.Module):
             )
         
     def forward(self, raw_eeg, eegf):
+        '''
+
+        '''
         batch_size = raw_eeg.shape[0]
         adaptive_filter = self.filter_generator(eegf)
-        process_pool = ProcessPoolExecutor(max_workers=8)
-        eeg_generator = process_pool.map(self.adaptive_filt, zip(adaptive_filter, raw_eeg))
+        filter_pool = ThreadPoolExecutor(max_workers=8)
+        eeg_generator = filter_pool.map(self.adaptive_filt, zip(adaptive_filter, raw_eeg))
         eeg = tensor([list(eeg_piece) for eeg_piece in eeg_generator])
         eeg = eeg.reshape((batch_size, self.chans, -1))
         eeg = eeg[:, :, self.local_padding:-self.local_padding]
+        # I used to write these 7 lines above in one line, but it was unreadable.
         en_out = self.encoder(eeg)
         en_out = en_out.view(en_out.size(0), -1)
         mu = self.h_mu(en_out)
