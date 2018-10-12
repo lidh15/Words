@@ -78,8 +78,8 @@ class EEGvae(nn.Module):
         adaptive_filter = self.filter_generator(eegf)
         filter_pool = ThreadPoolExecutor(max_workers=8)
         eeg_generator = filter_pool.map(self.adaptive_filt, zip(adaptive_filter, raw_eeg))
-        eeg = tensor([list(eeg_piece) for eeg_piece in eeg_generator])
-        eeg = eeg.reshape((batch_size, self.chans, -1))
+        eeg = [list(eeg_piece) for eeg_piece in eeg_generator]
+        eeg = tensor(eeg).reshape((batch_size, self.chans, -1))
         eeg = eeg[:, :, self.filter_padding:-self.filter_padding]
         # I used to write these 7 lines above in one line, but it was unreadable.
         en_out = self.encoder(eeg)
