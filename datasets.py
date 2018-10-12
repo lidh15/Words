@@ -18,7 +18,7 @@ from torch.utils import data
 
 
 class EEG500ms(data.Dataset):
-    def __init__(self, test_IDs=[], max_sample_num=200000, sample_shape=(12,63), data_path='./data/', label_path='./wordslist/', training=True):
+    def __init__(self, test_IDs=[], max_sample_num=200000, sample_shape=(12,63), data_path='./data/', label_path='./wordlists/', training=True):
         vocab = {}
         eeg_list = []
         label_list = []
