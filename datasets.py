@@ -86,8 +86,8 @@ class EEG500ms(data.Dataset):
         for i in range(chans):
             eeg[i] /= eeg_std[i]
         eegf = np.abs(fft(eeg)[:, 4:18])
-        eeg = eeg.reshape(length*chans)
-        eegf = eegf.reshape(eegf.shape[0]*eegf.shape[1])
+        eeg = eeg.reshape(length*chans).astype('float32')
+        eegf = eegf.reshape(eegf.shape[0]*eegf.shape[1]).astype('float32')
         if not self.training: # For validation, return all information
             y = self.label_list[index]
         else:
