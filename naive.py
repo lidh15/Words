@@ -11,12 +11,12 @@ import torch
 # import xlrd
 from torch.utils.data import DataLoader
 
-from models import EEGvae
+from models import EEGnaive
 from datasets import EEG500ms
 
 
 CUDA = 1
-LR = 0.001
+LR = 0.0001
 GPU = 7
 EPOCHS = 5
 PARA = 32
@@ -36,14 +36,6 @@ def adjust_learning_rate(optimizer, epoch, initial_lr=LR):
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
 
-def loss_func(output, x, mu, logvar):
-    mse = torch.nn.MSELoss(reduction='sum') # size_average=False
-    mse_loss = mse(output, x)
-    z_loss = -0.5*(1+logvar.sum()-mu.pow(2).sum()-logvar.exp().sum())
-    loss = mse_loss + z_loss
-    return loss, mse_loss, z_loss
-
-
 # Datasets
 training_set = EEG500ms(test_IDs=training, max_sample_num=20000)
 t_len = len(training_set)
@@ -51,27 +43,26 @@ t_len = len(training_set)
 training_generator = DataLoader(training_set, **params)
 # Network
 if CUDA:
-    eegnet = EEGvae(GPU).cuda(GPU)
+    eegnet = EEGnaive(GPU).cuda(GPU)
 else:
-    eegnet = EEGvae()
+    eegnet = EEGnaive()
 
+loss_func = torch.nn.MSELoss()
 optimizer = torch.optim.Adam(eegnet.parameters(), lr=LR)
 # Training process
 for epoch in range(EPOCHS):
     adjust_learning_rate(optimizer, epoch)
     # if epoch % 5 == 4:
     if True:
-        total_mse_loss = 0
-        total_z_loss = 0
+        total_loss = 0
         for local_batch, local_f, target in training_generator:
             if CUDA:
                 local_batch = local_batch.cuda(GPU)
                 local_f = local_f.cuda(GPU)
                 target = target.cuda(GPU)
-            output, mu, logvar = eegnet(local_batch, local_f)
-            loss, mse, z = loss_func(output, target, mu, logvar)
-            total_mse_loss += mse.data.item()/t_len
-            total_z_loss += z.data.item()/t_len
+            output = eegnet(local_batch, local_f)
+            loss = loss_func(output, target)
+            total_loss += loss.data.item()/t_len
             optimizer.zero_grad() # clear gradients for this training step
             loss.backward() # backpropagation, compute gradients
             optimizer.step() # apply gradient
@@ -79,39 +70,35 @@ for epoch in range(EPOCHS):
         # print('training done')
 
         # # Validation process
-        # val_mse_loss = 0
-        # val_z_loss = 0
+        # val_loss = 0
         # for val_batch, val_f, target in validation_generator:
         #     if CUDA:
         #         val_batch = val_batch.cuda(GPU)
         #         val_f = val_f.cuda(GPU)
         #         target = target.cuda(GPU)
-        #     output, mu, logvar = eegnet(val_batch, val_f)
-        #     loss, mse, z = loss_func(output, target, mu, logvar)
-        #     val_mse_loss += mse.data.item()/v_len
-        #     val_z_loss += z.data.item()/v_len
+        #     output = eegnet(val_batch, val_f)
+        #     loss = loss_func(output, target)
+        #     val_loss += loss.data.item()/v_len
         
-        # print('epoch %3d | train loss: %2.3f | val loss: %2.3f | train z loss: %2.3f | val z loss: %2.3f' \
-        #     % (epoch, total_mse_loss, val_mse_loss, total_z_loss, val_z_loss))
-        print('epoch %3d | train mse loss: %2.3f | train z loss: %2.3f' % (epoch, total_mse_loss, total_z_loss))
+        # print('epoch %3d | train loss: %2.3f | val loss: %2.3f % (epoch, total_loss, val_loss))
+        print('epoch %3d | train loss: %2.3f ' % (epoch, total_loss))
 
     if epoch == EPOCHS-1:
-        data = np.zeros((t_len,4))
+        data = np.zeros((t_len, 100))
         i = 0
         eegnet.eval()
-        for local_batch, local_f, _ in training_generator:
+        for local_batch, local_f, target in training_generator:
             if CUDA:
                 local_batch = local_batch.cuda(GPU)
                 local_f = local_f.cuda(GPU)
-            _, mu, logvar = eegnet(local_batch, local_f)
+            output = eegnet(local_batch, local_f)
             if CUDA:
-                mu = mu.cpu()
-                logvar = logvar.cpu()
-            data[i*PARA:i*PARA+PARA,:2] = mu.detach().numpy()
-            data[i*PARA:i*PARA+PARA,2:4] = logvar.detach().numpy()
+                output = output.cpu()
+            data[i*PARA:i*PARA+PARA, :50] = output.detach().numpy()
+            data[i*PARA:i*PARA+PARA, 50:] = target
             i += 1
         np.save('out.npy', data)
-        torch.save(eegnet.state_dict(), 'vae.pkl')
+        torch.save(eegnet.state_dict(), 'naive.pkl')
     
     # else:
     #     for local_batch in training_generator:
