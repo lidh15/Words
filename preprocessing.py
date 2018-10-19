@@ -9,6 +9,7 @@ chanLabels = ['AF3', 'F7', 'F3', 'FC5', 'T7', 'P7', 'P8', 'T8', 'FC6', 'F4', 'F8
 rawDataPath = './rawData/'
 dataPath = './data/'
 files = os.listdir(rawDataPath)
+FILT = False
 for csvFile in files:
     if csvFile.endswith('.pm.csv'):
         pass
@@ -31,13 +32,17 @@ for csvFile in files:
             timeStamp = timeStamp[start:]
             timeStamp -= timeStamp[0]
             freq = len(timeStamp)/timeStamp[-1]*1000/2
-            N, Wn = cheb2ord([8/freq, 35/freq], [5/freq, 40/freq], 3, 20)
-            b, a = cheby2(N, 20, Wn, 'bandpass')
-            data = data[start:]
-            for i in range(chans):
-                data[:,i] = filtfilt(b, a, data[:,i], method='gust')
-            # np.save(data, './data/'+csvFile[:3]+'.npy')
-        f = h5py.File(dataPath+csvFile[:3]+'.h5','w')
+            if FILT:
+                N, Wn = cheb2ord([8/freq, 35/freq], [5/freq, 40/freq], 3, 20)
+                b, a = cheby2(N, 20, Wn, 'bandpass')
+                data = data[start:]
+                for i in range(chans):
+                    data[:, i] = filtfilt(b, a, data[:, i], method='gust')
+                # np.save(data, './data/'+csvFile[:3]+'.npy')
+        if FILT:
+            f = h5py.File(dataPath+csvFile[:3]+'.h5','w')
+        else:
+            f = h5py.File(dataPath+'raw'+csvFile[:3]+'.h5','w')
         f['data'] = data
         f['time'] = timeStamp
         f['frequency'] = freq*2
