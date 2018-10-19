@@ -1,5 +1,6 @@
 __pycache__
 data
+rawData
 wordlists
 *.txt
 *.xlsx
