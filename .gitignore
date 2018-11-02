@@ -1,7 +1,7 @@
 __pycache__
-data
-rawData
-wordlists
+data/
+rawData/
+wordlists/
 *.txt
 *.xlsx
 *.pkl
